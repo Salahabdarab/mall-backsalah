@@ -1,0 +1,57 @@
+{
+  "info": {
+    "name": "Mall API v1",
+    "_postman_id": "mall-api-v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:4000/api/health"
+      }
+    },
+    {
+      "name": "Login (Admin)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"admin@mall.com\", \"password\": \"123456\"}"
+        },
+        "url": "http://localhost:4000/api/auth/login"
+      }
+    },
+    {
+      "name": "Login (Tenant)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\": \"tenant@mall.com\", \"password\": \"123456\"}"
+        },
+        "url": "http://localhost:4000/api/auth/login"
+      }
+    },
+    {
+      "name": "Catalog Wings",
+      "request": {
+        "method": "GET",
+        "url": "http://localhost:4000/api/catalog/wings"
+      }
+    }
+  ]
+}

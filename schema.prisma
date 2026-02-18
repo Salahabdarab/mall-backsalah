@@ -1,0 +1,319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum StoreStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum StaffRole {
+  MANAGER
+  SALES
+  PRODUCTS
+}
+
+enum PromoStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  REJECTED
+  EXPIRED
+  STOPPED
+}
+
+enum PromoType {
+  PERCENT
+  AMOUNT
+  FREESHIP
+  COUPON
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum CurrencyCode {
+  YER
+  SAR
+  USD
+}
+
+model User {
+  id           BigInt      @id @default(autoincrement())
+  name         String
+  email        String      @unique
+  passwordHash String
+  status       UserStatus  @default(ACTIVE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  roles        UserRole[]
+  ownedStores  Store[]     @relation("StoreOwner")
+  staffLinks   StoreStaff[]
+  carts        Cart[]
+  orders       Order[]
+  promosCreated Promotion[] @relation("PromoCreatedBy")
+  promosApproved Promotion[] @relation("PromoApprovedBy")
+}
+
+model Role {
+  id    Int      @id @default(autoincrement())
+  code  String   @unique // ADMIN TENANT CUSTOMER STAFF
+  name  String
+  users UserRole[]
+}
+
+model UserRole {
+  id     BigInt @id @default(autoincrement())
+  userId BigInt
+  roleId Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, roleId])
+}
+
+model Wing {
+  id        BigInt @id @default(autoincrement())
+  name      String
+  slug      String @unique
+  status    Boolean @default(true)
+  sortOrder Int @default(0)
+  createdAt DateTime @default(now())
+
+  stores Store[]
+}
+
+model Store {
+  id          BigInt @id @default(autoincrement())
+  wingId      BigInt
+  ownerUserId BigInt
+  name        String
+  slug        String @unique
+  description String?
+  currency    CurrencyCode @default(YER)
+  status      StoreStatus @default(PENDING)
+  signboardUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  wing   Wing @relation(fields: [wingId], references: [id], onDelete: Restrict)
+  owner  User @relation("StoreOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+
+  staff   StoreStaff[]
+  sections StoreSection[]
+  products Product[]
+  promos   Promotion[]
+  cartsItems CartItem[]
+  orders   Order[]
+}
+
+model StoreStaff {
+  id      BigInt @id @default(autoincrement())
+  storeId BigInt
+  userId  BigInt
+  role    StaffRole
+  status  Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, userId])
+}
+
+model StoreSection {
+  id        BigInt @id @default(autoincrement())
+  storeId   BigInt
+  name      String
+  sortOrder Int @default(0)
+  status    Boolean @default(true)
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([storeId, name])
+}
+
+model Product {
+  id          BigInt @id @default(autoincrement())
+  storeId     BigInt
+  sectionId   BigInt?
+  name        String
+  description String?
+  basePrice   Decimal @db.Numeric(12,2)
+  currency    CurrencyCode @default(YER)
+  status      Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  store   Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  section StoreSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
+
+  images   ProductImage[]
+  variants ProductVariant[]
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+}
+
+model ProductImage {
+  id        BigInt @id @default(autoincrement())
+  productId BigInt
+  imageUrl  String
+  sortOrder Int @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model ProductVariant {
+  id            BigInt @id @default(autoincrement())
+  productId     BigInt
+  sku           String? @unique
+  priceOverride Decimal? @db.Numeric(12,2)
+  status        Boolean @default(true)
+  createdAt     DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  attributes VariantAttribute[]
+  inventory Inventory?
+  orderItems OrderItem[]
+  cartItems  CartItem[]
+}
+
+model VariantAttribute {
+  id             BigInt @id @default(autoincrement())
+  variantId      BigInt
+  attributeName  String
+  attributeValue String
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}
+
+model Inventory {
+  id               BigInt @id @default(autoincrement())
+  variantId        BigInt @unique
+  stockQty         Int @default(0)
+  lowStockThreshold Int @default(5)
+  updatedAt        DateTime @updatedAt
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+}
+
+model Cart {
+  id         BigInt @id @default(autoincrement())
+  customerId BigInt
+  status     Boolean @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  customer User @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items    CartItem[]
+
+  @@index([customerId])
+}
+
+model CartItem {
+  id        BigInt @id @default(autoincrement())
+  cartId    BigInt
+  storeId   BigInt
+  productId BigInt
+  variantId BigInt?
+  qty       Int
+  unitPriceSnapshot Decimal @db.Numeric(12,2)
+  currencySnapshot  CurrencyCode
+  createdAt DateTime @default(now())
+
+  cart   Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  store  Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([cartId])
+  @@index([storeId])
+}
+
+model Order {
+  id           BigInt @id @default(autoincrement())
+  storeId      BigInt
+  customerId   BigInt
+  currency     CurrencyCode
+  subtotal     Decimal @db.Numeric(12,2)
+  shippingFee  Decimal @db.Numeric(12,2) @default(0)
+  total        Decimal @db.Numeric(12,2)
+  status       OrderStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store    Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  customer User  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items    OrderItem[]
+}
+
+model OrderItem {
+  id        BigInt @id @default(autoincrement())
+  orderId   BigInt
+  productId BigInt
+  variantId BigInt?
+  qty       Int
+  unitPrice Decimal @db.Numeric(12,2)
+  snapshotJson Json @default("{}")
+
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+}
+
+model Promotion {
+  id          BigInt @id @default(autoincrement())
+  storeId     BigInt
+  title       String
+  type        PromoType
+  value       Decimal @db.Numeric(12,2) @default(0)
+  couponCode  String? @unique
+  startDate   DateTime?
+  endDate     DateTime?
+  status      PromoStatus @default(DRAFT)
+  createdById BigInt
+  approvedById BigInt?
+  rejectReason String?
+  priority    Int @default(0)
+  createdAt   DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdBy User @relation("PromoCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  approvedBy User? @relation("PromoApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([storeId])
+  @@index([status])
+}
